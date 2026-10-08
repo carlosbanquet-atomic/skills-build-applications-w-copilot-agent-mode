@@ -1,5 +1,5 @@
 import express from 'express';
-import { connectToDatabase } from './config/database.js';
+import { connectDatabase } from './config/database.js';
 import { Activity } from './models/activity.js';
 import { Leaderboard } from './models/leaderboard.js';
 import { Team } from './models/team.js';
@@ -59,7 +59,7 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 
 async function startServer() {
   try {
-    await connectToDatabase();
+    await connectDatabase();
     app.listen(port, '0.0.0.0', () => {
       console.log(`OctoFit API available at ${apiBaseUrl}`);
     });

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { connectToDatabase } from '../config/database.js';
+import { connectDatabase } from '../config/database.js';
 import { Activity } from '../models/activity.js';
 import { Leaderboard } from '../models/leaderboard.js';
 import { Team } from '../models/team.js';
@@ -11,79 +11,48 @@ import { Workout } from '../models/workout.js';
  */
 async function seedDatabase() {
   try {
-    await connectToDatabase();
+    await connectDatabase();
 
-    const users = await Promise.all([
-      User.findOneAndUpdate(
-        { username: 'maya.chen' },
-        {
-          $set: {
-            email: 'maya.chen@example.com',
-            displayName: 'Maya Chen',
-            age: 29,
-          },
-        },
-        { upsert: true, new: true, runValidators: true },
-      ),
-      User.findOneAndUpdate(
-        { username: 'liam.patel' },
-        {
-          $set: {
-            email: 'liam.patel@example.com',
-            displayName: 'Liam Patel',
-            age: 34,
-          },
-        },
-        { upsert: true, new: true, runValidators: true },
-      ),
-      User.findOneAndUpdate(
-        { username: 'sofia.rossi' },
-        {
-          $set: {
-            email: 'sofia.rossi@example.com',
-            displayName: 'Sofia Rossi',
-            age: 26,
-          },
-        },
-        { upsert: true, new: true, runValidators: true },
-      ),
-      User.findOneAndUpdate(
-        { username: 'noah.kim' },
-        {
-          $set: {
-            email: 'noah.kim@example.com',
-            displayName: 'Noah Kim',
-            age: 31,
-          },
-        },
-        { upsert: true, new: true, runValidators: true },
-      ),
-    ]);
+    const users = await Promise.all(
+      [
+        { username: 'maya.chen', email: 'maya.chen@example.com', displayName: 'Maya Chen', age: 29 },
+        { username: 'liam.patel', email: 'liam.patel@example.com', displayName: 'Liam Patel', age: 34 },
+        { username: 'sofia.rossi', email: 'sofia.rossi@example.com', displayName: 'Sofia Rossi', age: 26 },
+        { username: 'noah.kim', email: 'noah.kim@example.com', displayName: 'Noah Kim', age: 31 },
+      ].map(async (userData) => {
+        const existingUser = await User.findOne({ username: userData.username });
+        if (existingUser) {
+          existingUser.set(userData);
+          return existingUser.save();
+        }
+        return User.create(userData);
+      }),
+    );
 
-    const [trailblazers, waveRiders] = await Promise.all([
-      Team.findOneAndUpdate(
-        { name: 'Trailblazers' },
+    const teams = await Promise.all(
+      [
         {
-          $set: {
-            description: 'A running crew focused on building endurance together.',
-            members: [users[0]._id, users[1]._id],
-            captain: users[0]._id,
-          },
+          name: 'Trailblazers',
+          description: 'A running crew focused on building endurance together.',
+          members: [users[0]._id, users[1]._id],
+          captain: users[0]._id,
         },
-        { upsert: true, new: true, runValidators: true },
-      ),
-      Team.findOneAndUpdate(
-        { name: 'Wave Riders' },
         {
-          $set: {
-            description: 'A balanced team mixing pool sessions and strength work.',
-            members: [users[2]._id, users[3]._id],
-            captain: users[2]._id,
-          },
+          name: 'Wave Riders',
+          description: 'A balanced team mixing pool sessions and strength work.',
+          members: [users[2]._id, users[3]._id],
+          captain: users[2]._id,
         },
-        { upsert: true, new: true, runValidators: true },
-      ),
-    ]);
+      ].map(async (teamData) => {
+        const existingTeam = await Team.findOne({ name: teamData.name });
+        if (existingTeam) {
+          existingTeam.set(teamData);
+          return existingTeam.save();
+        }
+        return Team.create(teamData);
+      }),
+    );
+    const [trailblazers, waveRiders] = teams;
 
     await Promise.all([
       User.updateMany(
@@ -149,13 +118,14 @@ async function seedDatabase() {
     ];
 
     await Promise.all(
-      activities.map(({ seedKey, ...activity }) =>
-        Activity.findOneAndUpdate(
-          { seedKey },
-          { $set: activity },
-          { upsert: true, new: true, runValidators: true },
-        ),
-      ),
+      activities.map(async (activity) => {
+        const existingActivity = await Activity.findOne({ seedKey: activity.seedKey });
+        if (existingActivity) {
+          existingActivity.set(activity);
+          return existingActivity.save();
+        }
+        return Activity.create(activity);
+      }),
     );
 
     await Promise.all(
@@ -164,13 +134,18 @@ async function seedDatabase() {
         { user: users[1]._id, team: trailblazers._id, points: 980, rank: 3 },
         { user: users[2]._id, team: waveRiders._id, points: 1130, rank: 2 },
         { user: users[3]._id, team: waveRiders._id, points: 870, rank: 4 },
-      ].map((entry) =>
-        Leaderboard.findOneAndUpdate(
-          { user: entry.user, period: 'all-time' },
-          { $set: { ...entry, period: 'all-time' } },
-          { upsert: true, new: true, runValidators: true },
-        ),
-      ),
+      ].map(async (entry) => {
+        const leaderboardData = { ...entry, period: 'all-time' as const };
+        const existingEntry = await Leaderboard.findOne({
+          user: entry.user,
+          period: 'all-time',
+        });
+        if (existingEntry) {
+          existingEntry.set(leaderboardData);
+          return existingEntry.save();
+        }
+        return Leaderboard.create(leaderboardData);
+      }),
     );
 
     const workouts = [
@@ -209,13 +184,14 @@ async function seedDatabase() {
     ];
 
     await Promise.all(
-      workouts.map(({ name, ...workout }) =>
-        Workout.findOneAndUpdate(
-          { name },
-          { $set: workout },
-          { upsert: true, new: true, runValidators: true },
-        ),
-      ),
+      workouts.map(async (workoutData) => {
+        const existingWorkout = await Workout.findOne({ name: workoutData.name });
+        if (existingWorkout) {
+          existingWorkout.set(workoutData);
+          return existingWorkout.save();
+        }
+        return Workout.create(workoutData);
+      }),
     );
 
     console.log('Database seeding complete');
